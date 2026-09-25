@@ -42,7 +42,18 @@ class AssistantService:
             f"{self.settings.gemini_model}:generateContent"
         )
         async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(url, params={"key": self.settings.gemini_api_key}, json=payload)
+            response = await client.post(
+                url,
+                params={"key": self.settings.gemini_api_key},
+                json=payload,
+            )
+
+            if response.is_error:
+                print(
+                    f"Gemini API error: HTTP {response.status_code}: "
+                    f"{response.text[:1000]}"
+                )
+
             response.raise_for_status()
             return response.json()
 
