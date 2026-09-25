@@ -9,7 +9,7 @@ load_dotenv()
 
 class Settings(BaseModel):
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     weather_api_key: str | None = None
     weather_provider: str = "weatherapi"
     high_humidity_threshold: float = 80
@@ -25,7 +25,7 @@ class Settings(BaseModel):
 def get_settings() -> Settings:
     return Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
         weather_api_key=os.getenv("WEATHER_API_KEY") or None,
         weather_provider=os.getenv("WEATHER_PROVIDER", "weatherapi").lower(),
         high_humidity_threshold=float(os.getenv("HIGH_HUMIDITY_THRESHOLD", 80)),
