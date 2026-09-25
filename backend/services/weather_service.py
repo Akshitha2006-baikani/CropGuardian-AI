@@ -27,8 +27,8 @@ class WeatherService:
             payload = await self._fetch_weatherapi(location)
             return self._normalize_weatherapi(payload, location)
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
-    print(f"WeatherAPI error: {type(exc).__name__}: {exc}")
-    return WeatherUnavailable(message="Weather service is currently unavailable.")
+            print(f"WeatherAPI error: {type(exc).__name__}: {exc}")
+            return WeatherUnavailable(message="Weather service is currently unavailable.")
         except (KeyError, TypeError, ValueError, ValidationError):
             return WeatherUnavailable(message="Weather data was unavailable or malformed.")
 
