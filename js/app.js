@@ -7,6 +7,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Initialize Sub-modules
   UploadModule.init();
+  I18nModule.init();
+  AssistantModule.init();
+  DashboardModule.init();
   await SchemesModule.init();
 
   let treatmentsData = {};
@@ -26,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loadingCard = document.getElementById('analysisLoadingCard');
   const resultsSection = document.getElementById('resultsSection');
   const previewContainer = document.getElementById('previewContainer');
+  const cropSelect = document.getElementById('cropSelect');
 
   // Navigation Links
   initNavigation();
@@ -51,11 +55,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Multi-stage timed animation (2.8 seconds total)
         await runStageAnimation();
 
-        // Perform AI Analysis
-        const aiResult = await AIModule.analyzeCropImage(selectedImg, activePreset);
+        // Keep verified presets local; send arbitrary uploads to the backend only.
+        const aiResult = activePreset
+          ? AIModule.analyzeDemo(activePreset)
+          : await CropGuardianAPI.analyzeImage(UploadModule.getSelectedFile(), cropSelect?.value || 'Tomato');
         
-        // Calculate Risk Score
-        const riskScore = RiskMeterModule.calculateRiskScore(aiResult.confidence, aiResult.severity);
+        // Reuse cached farm weather when available; a missing provider must not block demo mode.
+        const weather = await DashboardModule.getWeather(StorageModule.getFarm().location);
+        let backendRisk = null;
+        try {
+          backendRisk = await CropGuardianAPI.calculateRisk({
+            confidence: aiResult.confidence,
+            severity: aiResult.severity,
+            disease: aiResult.disease,
+            weather: weather || null
+          });
+        } catch (riskError) {
+          console.warn('Using local risk calculation:', riskError);
+        }
+
+        // Preserve the existing local formula if the risk endpoint is unavailable.
+        const riskScore = backendRisk?.riskScore ?? RiskMeterModule.calculateRiskScore(aiResult.confidence, aiResult.severity);
         const riskInfo = RiskMeterModule.getRiskLevel(riskScore);
 
         // Fetch treatments
@@ -63,11 +83,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         currentAnalysisResult = {
           ...aiResult,
+          weather,
           riskScore,
+          riskReasons: backendRisk?.reasons || [],
+          weatherFactors: backendRisk?.weatherFactors || [],
           riskInfo,
           treatmentInfo,
           analyzedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
+        AssistantModule.setContext(currentAnalysisResult);
 
         // Render Results
         renderFullResults(currentAnalysisResult);
@@ -86,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (err) {
         console.error('Analysis failed:', err);
         stopLoadingExperience();
-        UploadModule.showToast('Analysis error. Please try another sample or image.', 'error');
+        UploadModule.showToast(err.message || "We couldn't analyze this image right now. Please try again.", 'error');
       }
     });
   }
@@ -96,31 +120,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnSaveSnapshot.addEventListener('click', () => {
       if (!currentAnalysisResult) return;
 
-      const snapshots = JSON.parse(localStorage.getItem('cropguardian_snapshots') || '[]');
       const newSnapshot = {
         id: Date.now(),
+        timestamp: currentAnalysisResult.timestamp,
         crop: currentAnalysisResult.crop,
+        scientificName: currentAnalysisResult.scientificName,
         disease: currentAnalysisResult.disease,
+        pathogen: currentAnalysisResult.pathogen,
+        symptomsSummary: currentAnalysisResult.symptomsSummary,
         confidence: currentAnalysisResult.confidence,
+        severity: currentAnalysisResult.severity,
         riskScore: currentAnalysisResult.riskScore,
         riskLevel: currentAnalysisResult.riskInfo.level,
+        mode: currentAnalysisResult.mode,
+        riskReasons: currentAnalysisResult.riskReasons,
+        weatherFactors: currentAnalysisResult.weatherFactors,
+        weather: currentAnalysisResult.weather,
+        recommendation: currentAnalysisResult.treatmentInfo?.urgency?.recommendation || 'Review the saved scan guidance.',
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         time: currentAnalysisResult.analyzedAt
       };
 
-      snapshots.unshift(newSnapshot);
-      localStorage.setItem('cropguardian_snapshots', JSON.stringify(snapshots.slice(0, 15)));
+      const saved = StorageModule.saveScan(newSnapshot);
+      if (!saved) {
+        UploadModule.showToast('Unable to save this snapshot in browser storage.', 'error');
+        return;
+      }
 
       // Visual button feedback
       const originalText = btnSaveSnapshot.innerHTML;
       btnSaveSnapshot.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span>Saved ?</span>
+        <span>Saved</span>
       `;
       btnSaveSnapshot.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
       btnSaveSnapshot.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.6)';
 
       UploadModule.showToast('Crop Health Snapshot saved successfully!', 'success');
+      DashboardModule.renderAll();
 
       setTimeout(() => {
         btnSaveSnapshot.innerHTML = originalText;
@@ -214,18 +251,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Top Banner Badges
     const aiModeBadge = document.getElementById('aiModeBadge');
     if (aiModeBadge) {
-      if (res.mode === 'api') {
+      if (res.mode === 'ai') {
         aiModeBadge.className = 'badge badge-live';
-        aiModeBadge.innerHTML = '? Gemini Live AI Mode';
+        aiModeBadge.textContent = I18nModule.t('aiAnalysis');
       } else {
         aiModeBadge.className = 'badge badge-demo';
-        aiModeBadge.innerHTML = '? Demo AI Mode (Deterministic Prototype)';
+        aiModeBadge.textContent = I18nModule.t('demoMode');
       }
     }
 
     // Main Identification
     const cropNameEl = document.getElementById('resultCropName');
     const diseaseNameEl = document.getElementById('resultDiseaseName');
+    const scientificNameEl = document.getElementById('resultScientificName');
     const pathogenEl = document.getElementById('resultPathogen');
     const confidenceValEl = document.getElementById('resultConfidenceVal');
     const confidenceBarEl = document.getElementById('resultConfidenceBar');
@@ -234,14 +272,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (cropNameEl) cropNameEl.textContent = res.crop;
     if (diseaseNameEl) diseaseNameEl.textContent = res.disease;
+    if (scientificNameEl) scientificNameEl.textContent = res.scientificName || 'Scientific name not available';
     if (pathogenEl) pathogenEl.textContent = res.pathogen || 'Pathogen Analysis Completed';
     if (confidenceValEl) confidenceValEl.textContent = res.confidence;
     if (confidenceBarEl) confidenceBarEl.style.width = res.confidence + '%';
+    const confidenceNoteEl = document.getElementById('resultConfidenceNote');
+    if (confidenceNoteEl) confidenceNoteEl.textContent = res.mode === 'ai' ? I18nModule.t('aiConfidenceNote') : I18nModule.t('demoConfidenceNote');
     if (severityValEl) {
       severityValEl.textContent = res.severity;
       severityValEl.style.color = res.severity.toLowerCase() === 'high' ? '#ef4444' : (res.severity.toLowerCase() === 'healthy' ? '#22c55e' : '#f59e0b');
     }
     if (symptomsEl) symptomsEl.textContent = res.symptomsSummary || 'Characteristic foliar lesions identified upon pattern inspection.';
+    const riskReasonsEl = document.getElementById('riskReasonsText');
+    if (riskReasonsEl) {
+      const reasons = res.riskReasons?.length ? [...res.riskReasons] : [];
+      if (!res.riskReasons?.length && res.severity === 'High') reasons.push('High disease severity');
+      if (!res.riskReasons?.length && res.severity === 'Medium') reasons.push('Moderate disease severity');
+      if (!res.riskReasons?.length && res.severity === 'Healthy') reasons.push('No active disease severity reported');
+      if (!res.riskReasons?.length && res.confidence >= 80) reasons.push('High AI confidence');
+      riskReasonsEl.textContent = reasons.length ? `Reasons: ${reasons.join(' · ')}` : 'Reasons: available scan information';
+    }
+    renderResultWeather(res.weather);
 
     // Snapshot Card Data
     const snapRiskEl = document.getElementById('snapRiskVal');
@@ -302,6 +353,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function renderResultWeather(weather) {
+    const card = document.getElementById('resultWeatherCard');
+    if (!card) return;
+    if (!weather || !weather.available) {
+      card.hidden = false;
+      document.getElementById('resultWeatherStatus').textContent = 'Weather unavailable';
+      document.getElementById('resultWeatherAdvisory').textContent = 'Weather context unavailable.';
+      return;
+    }
+    card.hidden = false;
+    document.getElementById('resultWeatherStatus').textContent = 'Available';
+    document.getElementById('resultWeatherHumidity').textContent = `Humidity: ${weather.humidity == null ? 'Not set' : weather.humidity + '%'}`;
+    document.getElementById('resultWeatherRain').textContent = `Rain chance: ${weather.rainProbability == null ? 'Not set' : weather.rainProbability + '%'}`;
+    document.getElementById('resultWeatherTemperature').textContent = `Temperature: ${weather.temperature == null ? 'Not set' : weather.temperature + '°C'}`;
+    const advisory = [];
+    if (weather.humidity != null && weather.humidity >= 80) advisory.push('Current humidity may increase fungal disease risk.');
+    if (weather.rainProbability != null && weather.rainProbability >= 60) advisory.push('Rain is expected soon; check local conditions before foliar treatments.');
+    document.getElementById('resultWeatherAdvisory').textContent = advisory.join(' ') || 'Current conditions may affect disease risk.';
+  }
+
   // =========================================================================
   // Navigation & Modals
   // =========================================================================
@@ -347,30 +418,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function initModals() {
-    // API Key Modal
+    // Backend status modal
     const btnOpenApiModal = document.getElementById('btnOpenApiModal');
     const apiModal = document.getElementById('apiSettingsModal');
     const closeApiModal = document.getElementById('btnCloseApiModal');
-    const btnSaveApiKey = document.getElementById('btnSaveApiKey');
-    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiStatusMessage = document.getElementById('apiStatusMessage');
 
     if (btnOpenApiModal && apiModal) {
       btnOpenApiModal.addEventListener('click', () => {
-        if (apiKeyInput) apiKeyInput.value = AIModule.getStoredApiKey() || '';
+        if (apiStatusMessage) apiStatusMessage.textContent = 'Checking backend status...';
         apiModal.classList.add('active');
+        CropGuardianAPI.getHealth()
+          .then(() => {
+            if (apiStatusMessage) apiStatusMessage.textContent = 'Backend connected. AI analysis is available when configured.';
+          })
+          .catch(() => {
+            if (apiStatusMessage) apiStatusMessage.textContent = 'Backend unavailable. Demo Mode remains available for verified presets.';
+          });
       });
     }
 
     if (closeApiModal && apiModal) {
       closeApiModal.addEventListener('click', () => apiModal.classList.remove('active'));
-    }
-
-    if (btnSaveApiKey && apiKeyInput && apiModal) {
-      btnSaveApiKey.addEventListener('click', () => {
-        AIModule.setStoredApiKey(apiKeyInput.value);
-        apiModal.classList.remove('active');
-        UploadModule.showToast('API Key settings saved!', 'success');
-      });
     }
 
     // History Modal
@@ -402,7 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderHistoryList(container) {
     if (!container) return;
-    const snapshots = JSON.parse(localStorage.getItem('cropguardian_snapshots') || '[]');
+    const snapshots = StorageModule.getScans();
 
     if (snapshots.length === 0) {
       container.innerHTML = '<p class="text-muted" style="text-align: center; padding: 2rem 0;">No crop snapshots saved yet. Complete an analysis and click "Save Crop Snapshot" to review past scans.</p>';
@@ -413,7 +482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="history-item-card">
         <div class="history-item-left">
           <h5>${s.crop}: ${s.disease}</h5>
-          <p class="text-muted">Recorded: ${s.date} at ${s.time || ''} � Confidence: ${s.confidence}%</p>
+          <p class="text-muted">Recorded: ${s.date} at ${s.time || ''} � Confidence: ${s.confidence}%</p>
         </div>
         <div class="history-item-right">
           <div class="history-score-tag">${s.riskScore}/100</div>

@@ -42,7 +42,7 @@ $$\text{DETECT} \longrightarrow \text{UNDERSTAND} \longrightarrow \text{ACT}$$
 
 ---
 
-##  Technology Stack
+## Technology Stack
 
 - **Frontend**: Pure HTML5 (Semantic, Accessible, ARIA compliant)
 - **Styling**: Modern Vanilla CSS3
@@ -57,6 +57,18 @@ $$\text{DETECT} \longrightarrow \text{UNDERSTAND} \longrightarrow \text{ACT}$$
   - `schemes.js`: Government support scheme loader and category filter.
   - `app.js`: Master application coordinator and state manager.
 - **Zero Heavy Frameworks**: No React/Angular overhead, no npm build step required. Runs directly in any browser.
+
+### Backend MVP
+
+The repository now includes a lightweight FastAPI backend under `backend/`. It provides:
+
+- `GET /api/health`
+- `POST /api/analyze` for validated multipart image analysis
+- `GET /api/weather?location=` with an explicit unavailable response until a weather provider is configured
+- `POST /api/risk` for transparent confidence/severity plus optional weather-factor assessment
+- `POST /api/assistant` for context-aware agricultural guidance
+
+Gemini access is server-side only. The browser no longer accepts or stores a Gemini API key. Uploaded images are sent to the backend; verified presets remain explicitly labeled `Demo Mode` and do not claim to analyze arbitrary images.
 ---
 
 ##  How to Run Locally
@@ -72,6 +84,38 @@ cd CropGuardian-AI
 python -m http.server 8000
 ```
 Open **`http://localhost:8000`** in your browser.
+
+### Backend setup
+
+Use Python 3.11 or newer, create a virtual environment, install `backend/requirements.txt`, and start the API from the repository root:
+
+```bash
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+pip install -r backend/requirements.txt
+copy .env.example .env
+uvicorn backend.main:app --reload --port 8001
+```
+
+Set `GEMINI_API_KEY` in `.env` to enable uploaded-image AI analysis. Set `WEATHER_API_KEY` and keep `WEATHER_PROVIDER=weatherapi` to enable WeatherAPI.com current conditions and forecast rain probability. The frontend is configured for `http://localhost:8001` and the static site for `http://localhost:8000`.
+
+Weather responses are normalized before reaching the frontend. If the key, provider, location, or upstream response is unavailable, the API returns a controlled unavailable response and the UI never fabricates weather. Risk assessment preserves the existing severity/confidence formula; configured heuristic thresholds add transparent humidity and rain factors, not disease probabilities.
+
+### Agricultural assistant and languages
+
+The assistant accepts a farmer question, selected language, and current application context such as crop, diagnosis, risk, weather, and farm location. Supported languages are English (`en`), Telugu (`te`), and Hindi (`hi`). The selected language is persisted locally and sent to the server-side Gemini prompt.
+
+`/api/assistant` returns a validated response containing `answer`, `actions`, `warnings`, `followUp`, and `mode`. With no `GEMINI_API_KEY`, it returns clearly labeled deterministic `FALLBACK` guidance so the demo remains usable. Provider errors return a controlled error; they are never silently presented as AI output.
+
+Assistant guidance is informational only. It does not provide pesticide dosage, guaranteed cures, yield predictions, or certified agronomic advice. Farmers should consult local agriculture experts or extension officers and follow product labels and local guidance.
+
+Run the current backend tests with:
+
+```bash
+pytest
+```
+
+The current implementation does not yet include authentication, database-backed profiles/scans, chatbot, multilingual translations, PWA caching, or a configured weather provider. These remain explicit next phases.
 
 ### Option 2: VS Code Live Server
 1. Open the `CropGuardian-AI` folder in VS Code.

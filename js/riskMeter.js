@@ -52,7 +52,7 @@ const RiskMeterModule = (function() {
         badgeClass: 'status-healthy',
         label: 'Healthy / Low Risk',
         color: '#22c55e',
-        explanation: 'Foliage demonstrates healthy chlorophyll pigmentation with minimal or negligible disease risk.',
+        explanation: 'Risk assessment based on the available scan information. No active disease severity was reported.',
         actionWindow: 'Routine Schedule',
         recoveryOutlook: 'Optimal (No active disease threat)'
       };
@@ -62,7 +62,7 @@ const RiskMeterModule = (function() {
         badgeClass: 'status-monitor',
         label: 'Moderate Risk (Monitor)',
         color: '#f59e0b',
-        explanation: 'Localized symptoms identified. Regular scouting and preventive cultural practices are advised.',
+        explanation: 'Risk assessment based on the available scan information. Continue scouting and preventive care.',
         actionWindow: 'Within 3 to 5 days',
         recoveryOutlook: 'Good if monitored and managed before canopy spread'
       };
@@ -72,7 +72,7 @@ const RiskMeterModule = (function() {
         badgeClass: 'status-action',
         label: 'High Risk (Immediate Action)',
         color: '#ef4444',
-        explanation: 'High confidence combined with higher disease severity indicates the crop should be inspected and addressed promptly.',
+        explanation: 'Risk assessment based on the available scan information. Inspect the crop and address symptoms promptly.',
         actionWindow: 'Within 24-48 hours',
         recoveryOutlook: 'Prompt agronomic intervention needed to protect yield'
       };
@@ -101,7 +101,7 @@ const RiskMeterModule = (function() {
       explanationText.textContent = riskInfo.explanation;
     }
 
-    // Semicircle arc radius is 90, total half-circle circumference is Pi * 90 ˜ 282.74
+    // Semicircle arc radius is 90, total half-circle circumference is Pi * 90 ï¿½ 282.74
     const totalCircumference = Math.PI * 90;
     
     if (fillArc) {

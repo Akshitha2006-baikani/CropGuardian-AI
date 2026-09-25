@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="api-base-url" content="http://localhost:8001">
   <title>CropGuardian AI — Early Crop Disease Detection & Decision Support</title>
   <meta name="description" content="Helping farmers detect crop diseases early before they lose their harvest with AI-powered pathology detection and actionable decision support.">
   <link rel="stylesheet" href="css/style.css">
@@ -27,13 +28,15 @@
         </a>
 
         <ul class="nav-links" id="navLinksList">
-          <li><a href="#home" class="nav-link active">Home</a></li>
-          <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
-          <li><a href="#scanner" class="nav-link">Crop Scanner</a></li>
-          <li><a href="#farmer-support" class="nav-link">Farmer Support</a></li>
+          <li><a href="#dashboard" class="nav-link" data-i18n="dashboard">Dashboard</a></li>
+          <li><a href="#home" class="nav-link active" data-i18n="home">Home</a></li>
+          <li><a href="#scanner" class="nav-link" data-i18n="scan">Scan</a></li>
+          <li><a href="#history" class="nav-link" data-i18n="history">History</a></li>
+          <li><a href="#profile" class="nav-link" data-i18n="farmProfile">Farm Profile</a></li>
         </ul>
 
         <div class="nav-actions">
+          <label class="language-control" for="languageSelect"><span class="sr-only">Language</span><select id="languageSelect" aria-label="Select language"><option value="en">English</option><option value="te">తెలుగు</option><option value="hi">हिन्दी</option></select></label>
           <button id="btnOpenHistoryModal" class="btn-icon-only" title="Saved Snapshots History" aria-label="View Saved Snapshots">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           </button>
@@ -42,9 +45,9 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
 
-          <a href="#scanner" class="btn btn-primary btn-scroll-scanner">
+            <a href="#scanner" class="btn btn-primary btn-scroll-scanner">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <span>Scan My Crop</span>
+            <span data-i18n="scanCrop">Scan My Crop</span>
           </a>
 
           <button id="mobileMenuToggle" class="btn-icon-only mobile-menu-toggle" aria-label="Toggle navigation menu">
@@ -56,6 +59,133 @@
   </header>
 
   <main>
+    <!-- Farmer Dashboard -->
+    <section class="dashboard-section" id="dashboard">
+      <div class="container">
+        <div class="dashboard-header">
+          <div>
+            <span class="section-tag" data-i18n="fieldOverview">Field overview</span>
+            <h1 class="dashboard-title">Good morning, <span id="dashboardFarmerName">farmer</span>.</h1>
+            <p class="section-subtitle">Your latest crop signals, farm details, and next actions in one place.</p>
+          </div>
+          <div class="dashboard-actions">
+            <a href="#scanner" class="btn btn-primary btn-scroll-scanner" data-i18n="scanCrop">Scan a Crop</a>
+            <a href="#history" class="btn btn-secondary" data-i18n="viewHistory">View Scan History</a>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="dashboard-card dashboard-summary-card glass-card">
+            <div class="dashboard-card-heading"><span class="card-kicker">Farm summary</span><span class="status-dot" aria-hidden="true"></span></div>
+            <h2 id="dashboardFarmName">Not set</h2>
+            <p id="dashboardFarmLocation">Add your farm location in your profile.</p>
+            <div class="dashboard-summary-meta"><span id="dashboardPrimaryCrop">Primary crop: Not set</span><span id="dashboardFarmSize">Size: Not set</span></div>
+            <a href="#profile" class="text-action">Edit farm profile <span aria-hidden="true">→</span></a>
+          </article>
+          <article class="dashboard-card glass-card">
+            <div class="dashboard-card-heading"><span class="card-kicker" data-i18n="cropHealth">Crop health</span><span class="dashboard-icon" aria-hidden="true">+</span></div>
+            <strong class="dashboard-value" id="dashboardHealthValue">Not set</strong>
+            <p id="dashboardHealthText">Start your first crop scan.</p>
+          </article>
+          <article class="dashboard-card glass-card">
+            <div class="dashboard-card-heading"><span class="card-kicker" data-i18n="latestRisk">Latest risk</span><span class="dashboard-icon" aria-hidden="true">!</span></div>
+            <strong class="dashboard-value" id="dashboardRiskValue">Not set</strong>
+            <p id="dashboardRiskText">Risk assessment based on available scan information.</p>
+          </article>
+          <article class="dashboard-card glass-card">
+            <div class="dashboard-card-heading"><span class="card-kicker" data-i18n="latestScan">Latest scan</span><span class="dashboard-icon" aria-hidden="true">⌁</span></div>
+            <strong class="dashboard-value dashboard-value-small" id="dashboardScanValue">No scans yet</strong>
+            <p id="dashboardScanText">Your saved scans will appear here.</p>
+          </article>
+          <article class="dashboard-card dashboard-weather-card glass-card">
+            <div class="dashboard-card-heading"><div><span class="card-kicker" data-i18n="weatherContext">Weather context</span><span id="dashboardWeatherStatus" class="weather-status">Not configured</span></div><button id="btnRefreshWeather" class="btn-icon-only" type="button" title="Refresh weather" aria-label="Refresh weather">↻</button></div>
+            <div id="dashboardWeatherState" class="dashboard-empty-state">Add your farm location to view weather.</div>
+            <div id="dashboardWeatherData" class="weather-data" hidden>
+              <strong id="dashboardTemperature">Not set</strong><span id="dashboardCondition">Not set</span>
+              <div class="weather-metrics"><span id="dashboardHumidity">Humidity: Not set</span><span id="dashboardRain">Rain chance: Not set</span><span id="dashboardRainfall">Rainfall: Not set</span><span id="dashboardWind">Wind: Not set</span></div>
+              <small id="dashboardWeatherUpdated" class="weather-updated">Updated recently</small>
+            </div>
+          </article>
+          <article class="dashboard-card dashboard-recommendation-card glass-card">
+            <div class="dashboard-card-heading"><span class="card-kicker" data-i18n="recommendation">Recommendation</span><span class="dashboard-icon" aria-hidden="true">✓</span></div>
+            <strong id="dashboardRecommendationTitle">No recommendation yet</strong>
+            <p id="dashboardRecommendationText">Complete a scan to receive crop-specific guidance.</p>
+          </article>
+        </div>
+
+        <div class="dashboard-lower-grid">
+          <article class="dashboard-panel glass-card">
+            <div class="panel-heading"><div><span class="card-kicker" data-i18n="alerts">Alerts</span><h2>What needs attention</h2></div></div>
+            <div id="dashboardAlerts" class="dashboard-empty-state">No alerts yet. Alerts will appear after a high-risk scan or configured weather check.</div>
+          </article>
+          <article class="dashboard-panel glass-card">
+            <div class="panel-heading"><div><span class="card-kicker" data-i18n="recentScans">Recent scans</span><h2>Your field history</h2></div><a href="#history" class="text-action" data-i18n="viewHistory">View all</a></div>
+            <div id="dashboardRecentScans" class="dashboard-empty-state">No scans yet. Start your first crop scan.</div>
+          </article>
+        </div>
+
+        <article class="assistant-panel glass-card" id="assistantPanel">
+          <div class="panel-heading">
+            <div><span class="card-kicker" data-i18n="assistant">Agricultural assistant</span><h2 data-i18n="assistantIntro">Ask a question about your current crop context.</h2></div>
+            <span id="assistantModeBadge" class="badge badge-demo">Deterministic guidance</span>
+          </div>
+          <div id="assistantMessages" class="assistant-messages" aria-live="polite">
+            <p class="assistant-empty" data-i18n="assistantIntro">Ask a question about your current crop context.</p>
+          </div>
+          <div class="assistant-prompts" aria-label="Suggested questions">
+            <button type="button" class="assistant-prompt" data-question="What should I do now?" data-i18n="quickNow">What should I do now?</button>
+            <button type="button" class="assistant-prompt" data-question="What should I monitor?" data-i18n="quickMonitor">What should I monitor?</button>
+            <button type="button" class="assistant-prompt" data-question="When should I scan again?" data-i18n="quickRescan">When should I scan again?</button>
+          </div>
+          <form id="assistantForm" class="assistant-form">
+            <label class="sr-only" for="assistantQuestion">Farmer question</label>
+            <input id="assistantQuestion" class="text-input" type="text" maxlength="1000" data-i18n-placeholder="assistantPlaceholder" placeholder="Ask about your crop..." autocomplete="off">
+            <button id="assistantSendButton" class="btn btn-primary" type="submit" data-i18n="send">Send</button>
+          </form>
+          <p id="assistantStatus" class="form-status" role="status" aria-live="polite"></p>
+          <p class="assistant-safety-note">Guidance is informational. Consult a local agriculture expert and follow product labels/local guidance.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Farmer and Farm Profile -->
+    <section class="profile-section" id="profile">
+      <div class="container">
+        <div class="section-header section-header-left">
+          <span class="section-tag">Your field record</span>
+          <h2 class="section-title">Farmer & farm profile</h2>
+          <p class="section-subtitle">Keep your context close to the recommendations. Nothing is assumed or pre-filled.</p>
+        </div>
+        <div class="profile-grid">
+          <form id="farmerProfileForm" class="profile-card glass-card">
+            <div class="panel-heading"><div><span class="card-kicker">Farmer profile</span><h2>About you</h2></div></div>
+            <div class="form-grid">
+              <div class="input-field-group"><label class="input-label" for="farmerName">Name</label><input class="text-input" id="farmerName" name="name" autocomplete="name"></div>
+              <div class="input-field-group"><label class="input-label" for="farmerPhone">Phone</label><input class="text-input" id="farmerPhone" name="phone" type="tel" autocomplete="tel"></div>
+              <div class="input-field-group"><label class="input-label" for="farmerEmail">Email</label><input class="text-input" id="farmerEmail" name="email" type="email" autocomplete="email"></div>
+              <div class="input-field-group"><label class="input-label" for="farmerLocation">Location</label><input class="text-input" id="farmerLocation" name="location" autocomplete="address-level2"></div>
+              <div class="input-field-group"><label class="input-label" for="preferredLanguage">Preferred language</label><select class="text-input" id="preferredLanguage" name="preferredLanguage"><option value="">Not set</option><option value="English">English</option><option value="Telugu">Telugu</option><option value="Hindi">Hindi</option></select></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Save farmer profile</button><p class="form-status" id="farmerProfileStatus" role="status"></p>
+          </form>
+          <form id="farmProfileForm" class="profile-card glass-card">
+            <div class="panel-heading"><div><span class="card-kicker">Farm profile</span><h2>About your field</h2></div></div>
+            <div class="form-grid">
+              <div class="input-field-group"><label class="input-label" for="farmName">Farm name</label><input class="text-input" id="farmName" name="farmName"></div>
+              <div class="input-field-group"><label class="input-label" for="farmLocation">Location</label><input class="text-input" id="farmLocation" name="location"></div>
+              <div class="input-field-group"><label class="input-label" for="farmSize">Farm size</label><input class="text-input" id="farmSize" name="farmSize" inputmode="decimal" placeholder="e.g. 2 acres"></div>
+              <div class="input-field-group"><label class="input-label" for="primaryCrop">Primary crop</label><select class="text-input" id="primaryCrop" name="primaryCrop"><option value="">Not set</option><option>Tomato</option><option>Rice (Paddy)</option><option>Cotton</option><option>Potato</option></select></div>
+              <div class="input-field-group"><label class="input-label" for="growthStage">Growth stage</label><select class="text-input" id="growthStage" name="growthStage"><option value="">Not set</option><option>Seedling</option><option>Vegetative</option><option>Flowering</option><option>Harvest</option></select></div>
+              <div class="input-field-group"><label class="input-label" for="irrigationMethod">Irrigation method</label><select class="text-input" id="irrigationMethod" name="irrigationMethod"><option value="">Not set</option><option>Drip</option><option>Furrow</option><option>Flood</option><option>Rainfed</option></select></div>
+              <div class="input-field-group"><label class="input-label" for="soilType">Soil type</label><input class="text-input" id="soilType" name="soilType"></div>
+              <div class="input-field-group"><label class="input-label" for="plantingDate">Planting date</label><input class="text-input" id="plantingDate" name="plantingDate" type="date"></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Save farm profile</button><p class="form-status" id="farmProfileStatus" role="status"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <!-- Hero Section -->
     <section class="hero-section" id="home">
       <div class="container">
@@ -218,14 +348,14 @@
       <div class="container">
         <div class="section-header">
           <span class="section-tag">AI Crop Diagnostics</span>
-          <h2 class="section-title">Scan Your Crop</h2>
+          <h2 class="section-title" data-i18n="scanYourCrop">Scan Your Crop</h2>
           <p class="section-subtitle">Capture a clear image of an affected leaf for instant AI analysis and risk evaluation.</p>
         </div>
 
         <div class="scanner-layout">
           <!-- Dropzone & Preview Box -->
           <div class="dropzone-container glass-card">
-            <input type="file" id="cropFileInput" accept="image/*" capture="environment" aria-label="Upload crop leaf photo">
+            <input type="file" id="cropFileInput" accept="image/jpeg,image/png,image/webp" capture="environment" aria-label="Upload crop leaf photo">
 
             <div class="dropzone-box" id="dropzoneBox" tabindex="0" role="button" aria-label="Click or drag and drop leaf photo">
               <div class="dropzone-content">
@@ -264,9 +394,16 @@
             </div>
 
             <div class="scanner-controls">
+              <label class="input-label" for="cropSelect" data-i18n="selectCrop">Crop being scanned</label>
+              <select id="cropSelect" class="text-input" aria-label="Select crop being scanned">
+                <option value="Tomato">Tomato</option>
+                <option value="Rice (Paddy)">Rice (Paddy)</option>
+                <option value="Cotton">Cotton</option>
+                <option value="Potato">Potato</option>
+              </select>
               <button id="btnAnalyze" class="btn btn-primary btn-analyze">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Analyze Crop</span>
+                <span data-i18n="analyzeCrop">Analyze Crop</span>
               </button>
             </div>
           </div>
@@ -379,7 +516,7 @@
         
         <div class="results-header-banner">
           <div class="results-meta-left">
-            <span id="aiModeBadge" class="badge badge-demo">● Demo AI Mode (Deterministic Prototype)</span>
+            <span id="aiModeBadge" class="badge badge-demo">● Demo Mode</span>
             <span class="badge badge-pill">AI Decision Support</span>
           </div>
           <button id="btnResetScan" class="btn btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.88rem;">
@@ -396,6 +533,8 @@
                 <div class="crop-badge-row">
                   <span class="crop-tag" id="resultCropName">Tomato</span>
                   <span>•</span>
+                  <span class="pathogen-scientific" id="resultScientificName">Solanum lycopersicum</span>
+                  <span>•</span>
                   <span class="pathogen-scientific" id="resultPathogen">Alternaria solani</span>
                 </div>
                 <h2 class="disease-name-title" id="resultDiseaseName">Tomato Early Blight</h2>
@@ -404,7 +543,7 @@
 
             <div class="identification-metrics">
               <div class="metric-item">
-                <h5>Confidence Score</h5>
+                <h5 data-i18n="aiConfidence">AI confidence</h5>
                 <div class="metric-val-wrap">
                   <span class="metric-val-number" id="resultConfidenceVal">94</span>
                   <span class="metric-val-unit">%</span>
@@ -412,10 +551,11 @@
                 <div class="confidence-bar-bg">
                   <div class="confidence-bar-fill" id="resultConfidenceBar" style="width: 94%;"></div>
                 </div>
+                <p id="resultConfidenceNote" class="confidence-note">Demo Mode estimate; not calibrated confidence.</p>
               </div>
 
               <div class="metric-item">
-                <h5>Estimated Severity</h5>
+                <h5 data-i18n="estimatedSeverity">Estimated Severity</h5>
                 <div class="metric-val-wrap">
                   <span class="metric-val-number" id="resultSeverityVal" style="color: #ef4444;">High</span>
                 </div>
@@ -424,7 +564,7 @@
             </div>
 
             <div class="symptoms-box">
-              <strong style="color: #ffffff; display: block; margin-bottom: 0.2rem;">Visible Pathology:</strong>
+              <strong data-i18n="symptoms" style="color: #ffffff; display: block; margin-bottom: 0.2rem;">Visible Pathology:</strong>
               <span id="resultSymptomsSummary">Concentric ring target lesions with chlorotic yellow halo margins detected on lower foliage.</span>
             </div>
 
@@ -468,10 +608,16 @@
               HIGH RISK (IMMEDIATE ACTION)
             </div>
 
-            <p class="risk-explanation-text" id="riskExplanationText">
-              High confidence combined with higher estimated disease severity indicates that the crop should be inspected and addressed promptly.
-            </p>
+            <p class="risk-explanation-text" id="riskExplanationText">Risk assessment based on the available scan information.</p>
+            <p class="risk-reasons-text" id="riskReasonsText">Reasons will appear with the scan result.</p>
           </div>
+        </div>
+
+        <div class="result-weather-card glass-card" id="resultWeatherCard" hidden>
+          <div class="panel-heading"><div><span class="card-kicker">Weather context</span><h3>Conditions around this scan</h3></div><span id="resultWeatherStatus" class="weather-status">Weather unavailable</span></div>
+          <div class="result-weather-metrics"><span id="resultWeatherHumidity">Humidity: Not set</span><span id="resultWeatherRain">Rain chance: Not set</span><span id="resultWeatherTemperature">Temperature: Not set</span></div>
+          <p id="resultWeatherAdvisory" class="weather-advisory">Current conditions may affect disease risk.</p>
+          <div class="result-assistant-prompts" aria-label="Assistant questions"><button type="button" class="assistant-prompt" data-question="What should I do now?" data-i18n="quickNow">What should I do now?</button><button type="button" class="assistant-prompt" data-question="What should I monitor?" data-i18n="quickMonitor">What should I monitor?</button><button type="button" class="assistant-prompt" data-question="When should I scan again?" data-i18n="quickRescan">When should I scan again?</button></div>
         </div>
 
         <!-- Crop Health Snapshot Card -->
@@ -509,7 +655,7 @@
             <div class="snapshot-actions">
               <button id="btnSaveSnapshot" class="btn btn-primary btn-save-snapshot">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                <span>Save Crop Snapshot</span>
+                <span data-i18n="saveSnapshot">Save Crop Snapshot</span>
               </button>
             </div>
           </div>
@@ -595,6 +741,18 @@
       </div>
     </section>
 
+    <!-- Scan History -->
+    <section class="history-section" id="history">
+      <div class="container">
+        <div class="section-header section-header-left">
+          <span class="section-tag">Saved locally</span>
+          <h2 class="section-title">Scan history</h2>
+          <p class="section-subtitle">Review your saved crop checks on this device. History is not synced until an account is added.</p>
+        </div>
+        <div id="fullHistoryList" class="full-history-list"></div>
+      </div>
+    </section>
+
     <!-- Farmer Support Schemes -->
     <section class="support-section" id="farmer-support">
       <div class="container">
@@ -624,17 +782,8 @@
     <div class="modal-card">
       <button class="modal-close-btn" id="btnCloseApiModal" aria-label="Close API Modal">✕</button>
       <h3 id="apiModalTitle" style="font-size: 1.3rem; margin-bottom: 0.5rem;">AI Integration Settings</h3>
-      <p class="text-muted" style="font-size: 0.88rem;">CropGuardian AI runs in <strong>Demo AI Mode</strong> by default without requiring an API key. You can optionally connect a Gemini API Key for live multimodal inference.</p>
-      
-      <div class="input-field-group">
-        <label for="apiKeyInput" class="input-label">Gemini API Key (Optional):</label>
-        <input type="password" id="apiKeyInput" class="text-input" placeholder="AIzaSy...">
-        <span style="font-size: 0.75rem; color: #94a3b8;">Stored only locally in your browser session. Never exposed in source code.</span>
-      </div>
-
-      <div style="display: flex; gap: 0.8rem; justify-content: flex-end;">
-        <button class="btn btn-primary" id="btnSaveApiKey">Save Settings</button>
-      </div>
+      <p class="text-muted" style="font-size: 0.88rem;">AI analysis is securely handled by the CropGuardian backend. API keys are never entered or stored in this browser.</p>
+      <p id="apiStatusMessage" class="text-muted" style="font-size: 0.88rem; margin-top: 1rem;">Checking backend status...</p>
     </div>
   </div>
 
@@ -687,9 +836,14 @@
   </footer>
 
   <!-- Scripts -->
+  <script src="js/api.js"></script>
   <script src="js/upload.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/riskMeter.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/assistant.js"></script>
+  <script src="js/dashboard.js"></script>
   <script src="js/schemes.js"></script>
   <script src="js/app.js"></script>
 </body>

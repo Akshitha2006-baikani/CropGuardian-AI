@@ -36,6 +36,13 @@ const UploadModule = (function() {
       }
     });
 
+    dropzoneBox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
     fileInput.addEventListener('change', handleFileSelect);
 
     ['dragenter', 'dragover'].forEach(name => {
@@ -84,8 +91,12 @@ const UploadModule = (function() {
   }
 
   function processUploadedFile(file) {
-    if (!file.type.startsWith('image/')) {
-      showToast('Please upload a valid image file (JPG, PNG, WebP).', 'error');
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const fileName = file?.name?.toLowerCase() || '';
+    const extension = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')) : '';
+    const allowedExtensions = { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/webp': ['.webp'] };
+    if (!file || !allowedTypes.includes(file.type) || !allowedExtensions[file.type]?.includes(extension)) {
+      showToast('Please select a JPG, PNG, or WEBP image.', 'error');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -93,15 +104,32 @@ const UploadModule = (function() {
       return;
     }
 
-    selectedFile = file;
-    activePresetId = null;
-    document.querySelectorAll('.preset-item-btn').forEach(b => b.classList.remove('active'));
-
     const reader = new FileReader();
     reader.onload = function(event) {
-      selectedImageDataUrl = event.target.result;
-      renderPreview(selectedImageDataUrl, file.name, (file.size / 1024).toFixed(1) + ' KB');
-      showToast('Image loaded successfully! Ready for AI analysis.', 'success');
+      const image = new Image();
+      image.onload = function() {
+        if (!image.naturalWidth || !image.naturalHeight) {
+          showToast('We could not read this image. Please choose another file.', 'error');
+          return;
+        }
+        selectedFile = file;
+        activePresetId = null;
+        document.querySelectorAll('.preset-item-btn').forEach(b => b.classList.remove('active'));
+        selectedImageDataUrl = event.target.result;
+        renderPreview(selectedImageDataUrl, file.name, (file.size / 1024).toFixed(1) + ' KB');
+        if (Math.min(image.naturalWidth, image.naturalHeight) < 200) {
+          showToast('This image is very small. A clearer leaf photo may improve analysis.', 'info');
+        } else {
+          showToast('Image loaded successfully. Review the leaf framing before analysis.', 'success');
+        }
+      };
+      image.onerror = function() {
+        showToast('We could not read this image. Please choose another file.', 'error');
+      };
+      image.src = event.target.result;
+    };
+    reader.onerror = function() {
+      showToast('We could not read this image. Please choose another file.', 'error');
     };
     reader.readAsDataURL(file);
   }
