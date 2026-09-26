@@ -3,10 +3,15 @@ const StorageModule = (function() {
   const PROFILE_KEY = 'cropguardian_profile';
   const FARM_KEY = 'cropguardian_farm';
   const LANGUAGE_KEY = 'cropguardian_language';
+  let userScope = null;
+
+  function scopedKey(key) {
+    return userScope ? `${key}:${userScope}` : key;
+  }
 
   function readObject(key) {
     try {
-      const value = JSON.parse(localStorage.getItem(key) || '{}');
+      const value = JSON.parse(localStorage.getItem(scopedKey(key)) || '{}');
       return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     } catch (error) {
       console.warn('Stored profile data was invalid and has been reset.', error);
@@ -16,7 +21,7 @@ const StorageModule = (function() {
 
   function writeObject(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(scopedKey(key), JSON.stringify(value));
       return true;
     } catch (error) {
       console.warn('Unable to save profile data.', error);
@@ -26,7 +31,7 @@ const StorageModule = (function() {
 
   function readSnapshots() {
     try {
-      const value = JSON.parse(localStorage.getItem(SNAPSHOTS_KEY) || '[]');
+      const value = JSON.parse(localStorage.getItem(scopedKey(SNAPSHOTS_KEY)) || '[]');
       return Array.isArray(value) ? value.map(normalizeScan).filter(Boolean) : [];
     } catch (error) {
       console.warn('Stored scan history was invalid and has been reset.', error);
@@ -57,7 +62,7 @@ const StorageModule = (function() {
     const snapshots = readSnapshots();
     snapshots.unshift(scan);
     try {
-      localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(snapshots.slice(0, 15)));
+      localStorage.setItem(scopedKey(SNAPSHOTS_KEY), JSON.stringify(snapshots.slice(0, 15)));
       return true;
     } catch (error) {
       console.warn('Unable to save scan history.', error);
@@ -78,6 +83,19 @@ const StorageModule = (function() {
     return writeObject(SNAPSHOTS_KEY, []);
   }
 
+  function replaceScans(scans) {
+    const normalized = Array.isArray(scans)
+      ? scans.map(normalizeScan).filter(Boolean).slice(0, 15)
+      : [];
+    try {
+      localStorage.setItem(scopedKey(SNAPSHOTS_KEY), JSON.stringify(normalized));
+      return true;
+    } catch (error) {
+      console.warn('Unable to sync account scan history.', error);
+      return false;
+    }
+  }
+
   function getProfile() {
     return readObject(PROFILE_KEY);
   }
@@ -96,7 +114,7 @@ const StorageModule = (function() {
 
   function getLanguage() {
     try {
-      const value = localStorage.getItem(LANGUAGE_KEY);
+      const value = localStorage.getItem(scopedKey(LANGUAGE_KEY));
       return ['en', 'te', 'hi'].includes(value) ? value : 'en';
     } catch (error) {
       return 'en';
@@ -106,12 +124,20 @@ const StorageModule = (function() {
   function saveLanguage(language) {
     if (!['en', 'te', 'hi'].includes(language)) return false;
     try {
-      localStorage.setItem(LANGUAGE_KEY, language);
+      localStorage.setItem(scopedKey(LANGUAGE_KEY), language);
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  return { saveScan, getScans, deleteScan, deleteAllScans, getProfile, saveProfile, getFarm, saveFarm, getLanguage, saveLanguage };
+  function setUserScope(userId) {
+    userScope = userId == null ? null : String(userId);
+  }
+
+  return {
+    saveScan, getScans, deleteScan, deleteAllScans, replaceScans,
+    getProfile, saveProfile, getFarm, saveFarm, getLanguage, saveLanguage,
+    setUserScope
+  };
 })();

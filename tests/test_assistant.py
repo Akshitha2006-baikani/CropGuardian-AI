@@ -35,17 +35,21 @@ def test_assistant_rejects_blank_question() -> None:
         AssistantRequest(question="  ", language="en")
 
 
-def test_missing_key_returns_explicit_fallback() -> None:
-    result = asyncio.run(AssistantService(Settings()).answer(request("hi")))
-    assert result.mode == "FALLBACK"
-    assert "AI" in result.answer
-    assert result.warnings
+def test_missing_key_returns_actionable_configuration_error() -> None:
+    with pytest.raises(AssistantServiceError, match="GEMINI_API_KEY"):
+        asyncio.run(AssistantService(Settings()).answer(request("hi")))
 
 
 def test_language_is_propagated_to_provider_prompt() -> None:
     prompt = AssistantService._build_prompt(request("te"))
     assert "Telugu only" in prompt
     assert "Tomato Early Blight" in prompt
+    assert "irrigation" in prompt
+    assert "pests" in prompt
+
+
+def test_default_gemini_model_is_supported_flash_family() -> None:
+    assert Settings().gemini_model == "gemini-3.8-flash"
 
 
 def test_successful_provider_response_is_validated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,11 +82,11 @@ def test_provider_timeout_is_controlled(monkeypatch: pytest.MonkeyPatch) -> None
         raise httpx.ReadTimeout("timed out")
 
     monkeypatch.setattr(service, "_fetch_gemini", failed_fetch)
-    with pytest.raises(AssistantServiceError, match="temporarily unavailable"):
+    with pytest.raises(AssistantServiceError, match="timed out"):
         asyncio.run(service.answer(request()))
 
 
-def test_assistant_endpoint_returns_fallback_without_key() -> None:
+def test_assistant_endpoint_reports_missing_key_without_fabricating_answer() -> None:
     response = client.post("/api/assistant", json={"question": "What should I monitor?", "language": "en"})
-    assert response.status_code == 200
-    assert response.json()["mode"] == "FALLBACK"
+    assert response.status_code == 502
+    assert "GEMINI_API_KEY" in response.json()["detail"]

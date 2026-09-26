@@ -6,7 +6,7 @@ from backend.schemas.weather import WeatherData
 
 
 AssistantLanguage = Literal["en", "te", "hi"]
-AssistantMode = Literal["AI", "FALLBACK"]
+AssistantMode = Literal["AI"]
 
 
 class AssistantContext(BaseModel):

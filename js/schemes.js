@@ -6,6 +6,7 @@
 
 const SchemesModule = (function() {
   let allSchemes = [];
+  let selectedCategory = 'all';
 
   async function init() {
     try {
@@ -30,7 +31,7 @@ const SchemesModule = (function() {
     if (!container) return;
 
     if (!schemesToRender || schemesToRender.length === 0) {
-      container.innerHTML = '<p class="text-muted" style="grid-column: 1/-1; text-align: center;">No schemes found in this category.</p>';
+      container.innerHTML = `<p class="text-muted" style="grid-column: 1/-1; text-align: center;">${I18nModule.translateText('No schemes found in this category.')}</p>`;
       return;
     }
 
@@ -38,19 +39,19 @@ const SchemesModule = (function() {
       <div class="scheme-card glass-card">
         <div>
           <div class="scheme-top-row">
-            <span class="scheme-category-badge">${scheme.category}</span>
+            <span class="scheme-category-badge">${I18nModule.translateText(scheme.category)}</span>
             <span class="scheme-icon-circle">${scheme.icon || '??'}</span>
           </div>
-          <h4 class="scheme-title" style="margin-top: 0.8rem;">${scheme.name}</h4>
-          <div class="scheme-badge-subtitle">${scheme.badge}</div>
-          <p class="scheme-description">${scheme.description}</p>
+          <h4 class="scheme-title" style="margin-top: 0.8rem;">${I18nModule.translateText(scheme.name)}</h4>
+          <div class="scheme-badge-subtitle">${I18nModule.translateText(scheme.badge)}</div>
+          <p class="scheme-description">${I18nModule.translateText(scheme.description)}</p>
         </div>
         <div class="scheme-footer">
           <a href="${scheme.link}" target="_blank" rel="noopener noreferrer" class="scheme-link">
-            <span>Learn More</span>
+            <span>${I18nModule.translateText('Learn More')}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </a>
-          <span class="portal-verify-text">${scheme.portalName}</span>
+          <span class="portal-verify-text">${I18nModule.translateText(scheme.portalName)}</span>
         </div>
       </div>
     `).join('');
@@ -64,6 +65,7 @@ const SchemesModule = (function() {
         btn.classList.add('active');
 
         const category = btn.getAttribute('data-filter');
+        selectedCategory = category;
         if (category === 'all') {
           renderSchemes(allSchemes);
         } else {
@@ -71,6 +73,12 @@ const SchemesModule = (function() {
           renderSchemes(filtered);
         }
       });
+    });
+    document.addEventListener('cropguardian:languagechange', () => {
+      const schemes = selectedCategory === 'all'
+        ? allSchemes
+        : allSchemes.filter(scheme => scheme.category.toLowerCase().includes(selectedCategory));
+      renderSchemes(schemes);
     });
   }
 

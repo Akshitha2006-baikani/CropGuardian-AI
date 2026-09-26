@@ -6,9 +6,11 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Initialize Sub-modules
+  await AuthModule.init();
   UploadModule.init();
   I18nModule.init();
   AssistantModule.init();
+  if (AuthModule.isAuthenticated()) await AuthModule.loadUserData();
   DashboardModule.init();
   await SchemesModule.init();
 
@@ -21,6 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   let currentAnalysisResult = null;
+  document.addEventListener('cropguardian:languagechange', () => {
+    if (currentAnalysisResult) {
+      renderFullResults(currentAnalysisResult);
+      RiskMeterModule.animateGauge(currentAnalysisResult.riskScore);
+    }
+    DashboardModule.renderAll();
+  });
 
   // 2. DOM Elements
   const btnAnalyze = document.getElementById('btnAnalyze');
@@ -44,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const activePreset = UploadModule.getActivePreset();
 
       if (!selectedImg) {
-        UploadModule.showToast('Please select or upload a crop leaf image first.', 'error');
+        UploadModule.showToast(I18nModule.translateText('Please select or upload a crop leaf image first.'), 'error');
         return;
       }
 
@@ -110,14 +119,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (err) {
         console.error('Analysis failed:', err);
         stopLoadingExperience();
-        UploadModule.showToast(err.message || "We couldn't analyze this image right now. Please try again.", 'error');
+        UploadModule.showToast(I18nModule.translateText(err.message || "We couldn't analyze this image right now. Please try again."), 'error');
       }
     });
   }
 
   // 4. Save Crop Snapshot Handler
   if (btnSaveSnapshot) {
-    btnSaveSnapshot.addEventListener('click', () => {
+    btnSaveSnapshot.addEventListener('click', async () => {
       if (!currentAnalysisResult) return;
 
       const newSnapshot = {
@@ -143,20 +152,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const saved = StorageModule.saveScan(newSnapshot);
       if (!saved) {
-        UploadModule.showToast('Unable to save this snapshot in browser storage.', 'error');
+        UploadModule.showToast(I18nModule.translateText('Unable to save this snapshot in browser storage.'), 'error');
         return;
       }
+
+      const accountSaved = AuthModule.isAuthenticated()
+        ? await AuthModule.saveAnalysis(newSnapshot)
+        : true;
 
       // Visual button feedback
       const originalText = btnSaveSnapshot.innerHTML;
       btnSaveSnapshot.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span>Saved</span>
+        <span>${I18nModule.translateText('Saved')}</span>
       `;
       btnSaveSnapshot.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
       btnSaveSnapshot.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.6)';
 
-      UploadModule.showToast('Crop Health Snapshot saved successfully!', 'success');
+      UploadModule.showToast(
+        I18nModule.translateText(accountSaved ? 'Crop Health Snapshot saved successfully!' : 'Saved on this device. Account sync is unavailable.'),
+        accountSaved ? 'success' : 'error'
+      );
       DashboardModule.renderAll();
 
       setTimeout(() => {
@@ -270,27 +286,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const severityValEl = document.getElementById('resultSeverityVal');
     const symptomsEl = document.getElementById('resultSymptomsSummary');
 
-    if (cropNameEl) cropNameEl.textContent = res.crop;
-    if (diseaseNameEl) diseaseNameEl.textContent = res.disease;
-    if (scientificNameEl) scientificNameEl.textContent = res.scientificName || 'Scientific name not available';
-    if (pathogenEl) pathogenEl.textContent = res.pathogen || 'Pathogen Analysis Completed';
+    if (cropNameEl) cropNameEl.textContent = I18nModule.translateText(res.crop);
+    if (diseaseNameEl) diseaseNameEl.textContent = I18nModule.translateText(res.disease);
+    if (scientificNameEl) scientificNameEl.textContent = I18nModule.translateText(res.scientificName || 'Scientific name not available');
+    if (pathogenEl) pathogenEl.textContent = I18nModule.translateText(res.pathogen || 'Pathogen Analysis Completed');
     if (confidenceValEl) confidenceValEl.textContent = res.confidence;
     if (confidenceBarEl) confidenceBarEl.style.width = res.confidence + '%';
     const confidenceNoteEl = document.getElementById('resultConfidenceNote');
     if (confidenceNoteEl) confidenceNoteEl.textContent = res.mode === 'ai' ? I18nModule.t('aiConfidenceNote') : I18nModule.t('demoConfidenceNote');
     if (severityValEl) {
-      severityValEl.textContent = res.severity;
+      severityValEl.textContent = I18nModule.translateText(res.severity);
       severityValEl.style.color = res.severity.toLowerCase() === 'high' ? '#ef4444' : (res.severity.toLowerCase() === 'healthy' ? '#22c55e' : '#f59e0b');
     }
-    if (symptomsEl) symptomsEl.textContent = res.symptomsSummary || 'Characteristic foliar lesions identified upon pattern inspection.';
+    if (symptomsEl) symptomsEl.textContent = I18nModule.translateText(res.symptomsSummary || 'Characteristic foliar lesions identified upon pattern inspection.');
     const riskReasonsEl = document.getElementById('riskReasonsText');
     if (riskReasonsEl) {
       const reasons = res.riskReasons?.length ? [...res.riskReasons] : [];
-      if (!res.riskReasons?.length && res.severity === 'High') reasons.push('High disease severity');
-      if (!res.riskReasons?.length && res.severity === 'Medium') reasons.push('Moderate disease severity');
-      if (!res.riskReasons?.length && res.severity === 'Healthy') reasons.push('No active disease severity reported');
-      if (!res.riskReasons?.length && res.confidence >= 80) reasons.push('High AI confidence');
-      riskReasonsEl.textContent = reasons.length ? `Reasons: ${reasons.join(' · ')}` : 'Reasons: available scan information';
+      if (!res.riskReasons?.length && res.severity === 'High') reasons.push(I18nModule.translateText('High disease severity'));
+      if (!res.riskReasons?.length && res.severity === 'Medium') reasons.push(I18nModule.translateText('Moderate disease severity'));
+      if (!res.riskReasons?.length && res.severity === 'Healthy') reasons.push(I18nModule.translateText('No active disease severity reported'));
+      if (!res.riskReasons?.length && res.confidence >= 80) reasons.push(I18nModule.translateText('High AI confidence'));
+      riskReasonsEl.textContent = reasons.length ? I18nModule.translateText('Reasons: {reasons}', { reasons: reasons.join(' · ') }) : I18nModule.translateText('Reasons: available scan information');
     }
     renderResultWeather(res.weather);
 
@@ -302,11 +318,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (snapRiskEl) snapRiskEl.textContent = res.riskScore + '/100';
     if (snapLevelEl) {
-      snapLevelEl.textContent = res.riskInfo.level;
+      snapLevelEl.textContent = I18nModule.translateText(res.riskInfo.level);
       snapLevelEl.style.color = res.riskInfo.color;
     }
-    if (snapOutlookEl) snapOutlookEl.textContent = res.treatmentInfo?.recoveryOutlook || res.riskInfo.recoveryOutlook;
-    if (snapWindowEl) snapWindowEl.textContent = res.treatmentInfo?.urgency?.actionWindow || res.riskInfo.actionWindow;
+    if (snapOutlookEl) snapOutlookEl.textContent = I18nModule.translateText(res.treatmentInfo?.recoveryOutlook || res.riskInfo.recoveryOutlook);
+    if (snapWindowEl) snapWindowEl.textContent = I18nModule.translateText(res.treatmentInfo?.urgency?.actionWindow || res.riskInfo.actionWindow);
 
     // Treatments List
     const treatmentListEl = document.getElementById('treatmentList');
@@ -314,7 +330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       treatmentListEl.innerHTML = res.treatmentInfo.treatments.map(t => `
         <li>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>${t}</span>
+          <span>${I18nModule.translateText(t)}</span>
         </li>
       `).join('');
     }
@@ -325,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       preventionListEl.innerHTML = res.treatmentInfo.prevention.map(p => `
         <li>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>${p}</span>
+          <span>${I18nModule.translateText(p)}</span>
         </li>
       `).join('');
     }
@@ -342,14 +358,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       urgencyBox.className = `urgency-badge-box urgency-${uLevel.toLowerCase()}`;
     }
     if (urgencyLevelEl) {
-      urgencyLevelEl.textContent = uLevel + ' URGENCY';
+      urgencyLevelEl.textContent = I18nModule.translateText(`${uLevel} URGENCY`);
       urgencyLevelEl.style.color = uLevel === 'HIGH' ? '#ef4444' : (uLevel === 'LOW' ? '#22c55e' : '#f59e0b');
     }
     if (urgencyWindowEl) {
-      urgencyWindowEl.textContent = res.treatmentInfo?.urgency?.actionWindow || res.riskInfo.actionWindow;
+      urgencyWindowEl.textContent = I18nModule.translateText(res.treatmentInfo?.urgency?.actionWindow || res.riskInfo.actionWindow);
     }
     if (urgencyAdviceEl) {
-      urgencyAdviceEl.textContent = res.treatmentInfo?.urgency?.recommendation || res.riskInfo.explanation;
+      urgencyAdviceEl.textContent = I18nModule.translateText(res.treatmentInfo?.urgency?.recommendation || res.riskInfo.explanation);
     }
   }
 
@@ -358,19 +374,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!card) return;
     if (!weather || !weather.available) {
       card.hidden = false;
-      document.getElementById('resultWeatherStatus').textContent = 'Weather unavailable';
-      document.getElementById('resultWeatherAdvisory').textContent = 'Weather context unavailable.';
+      document.getElementById('resultWeatherStatus').textContent = I18nModule.translateText('Weather unavailable');
+      document.getElementById('resultWeatherAdvisory').textContent = I18nModule.translateText('Weather context unavailable.');
       return;
     }
     card.hidden = false;
-    document.getElementById('resultWeatherStatus').textContent = 'Available';
-    document.getElementById('resultWeatherHumidity').textContent = `Humidity: ${weather.humidity == null ? 'Not set' : weather.humidity + '%'}`;
-    document.getElementById('resultWeatherRain').textContent = `Rain chance: ${weather.rainProbability == null ? 'Not set' : weather.rainProbability + '%'}`;
-    document.getElementById('resultWeatherTemperature').textContent = `Temperature: ${weather.temperature == null ? 'Not set' : weather.temperature + '°C'}`;
+    document.getElementById('resultWeatherStatus').textContent = I18nModule.translateText('Available');
+    document.getElementById('resultWeatherHumidity').textContent = I18nModule.translateText('Humidity: {value}', { value: weather.humidity == null ? I18nModule.translateText('Not set') : weather.humidity + '%' });
+    document.getElementById('resultWeatherRain').textContent = I18nModule.translateText('Rain chance: {value}', { value: weather.rainProbability == null ? I18nModule.translateText('Not set') : weather.rainProbability + '%' });
+    document.getElementById('resultWeatherTemperature').textContent = I18nModule.translateText('Temperature: {value}', { value: weather.temperature == null ? I18nModule.translateText('Not set') : weather.temperature + '°C' });
     const advisory = [];
-    if (weather.humidity != null && weather.humidity >= 80) advisory.push('Current humidity may increase fungal disease risk.');
-    if (weather.rainProbability != null && weather.rainProbability >= 60) advisory.push('Rain is expected soon; check local conditions before foliar treatments.');
-    document.getElementById('resultWeatherAdvisory').textContent = advisory.join(' ') || 'Current conditions may affect disease risk.';
+    if (weather.humidity != null && weather.humidity >= 80) advisory.push(I18nModule.translateText('Current humidity may increase fungal disease risk.'));
+    if (weather.rainProbability != null && weather.rainProbability >= 60) advisory.push(I18nModule.translateText('Rain is expected soon; check local conditions before foliar treatments.'));
+    document.getElementById('resultWeatherAdvisory').textContent = advisory.join(' ') || I18nModule.translateText('Current conditions may affect disease risk.');
   }
 
   // =========================================================================
@@ -426,14 +442,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnOpenApiModal && apiModal) {
       btnOpenApiModal.addEventListener('click', () => {
-        if (apiStatusMessage) apiStatusMessage.textContent = 'Checking backend status...';
+        if (apiStatusMessage) apiStatusMessage.textContent = I18nModule.translateText('Checking backend status...');
         apiModal.classList.add('active');
         CropGuardianAPI.getHealth()
           .then(() => {
-            if (apiStatusMessage) apiStatusMessage.textContent = 'Backend connected. AI analysis is available when configured.';
+            if (apiStatusMessage) apiStatusMessage.textContent = I18nModule.translateText('Backend connected. AI analysis is available when configured.');
           })
           .catch(() => {
-            if (apiStatusMessage) apiStatusMessage.textContent = 'Backend unavailable. Demo Mode remains available for verified presets.';
+            if (apiStatusMessage) apiStatusMessage.textContent = I18nModule.translateText('Backend unavailable. Demo Mode remains available for verified presets.');
           });
       });
     }

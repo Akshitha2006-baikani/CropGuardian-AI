@@ -52,7 +52,7 @@ $$\text{DETECT} \longrightarrow \text{UNDERSTAND} \longrightarrow \text{ACT}$$
   - Fully responsive Grid and Flexbox layouts (Mobile, Tablet, Desktop)
 - **Scripting**: Modular Vanilla JavaScript (ES6+)
   - `upload.js`: Upload, camera capture, file validation, and vector preset generators.
-  - `ai.js`: Multimodal Gemini API integration with automatic deterministic fallback.
+  - `ai.js`: Demo preset metadata and analysis display helpers.
   - `riskMeter.js`: Risk score calculation algorithm and animated SVG gauge renderer.
   - `schemes.js`: Government support scheme loader and category filter.
   - `app.js`: Master application coordinator and state manager.
@@ -67,8 +67,12 @@ The repository now includes a lightweight FastAPI backend under `backend/`. It p
 - `GET /api/weather?location=` with an explicit unavailable response until a weather provider is configured
 - `POST /api/risk` for transparent confidence/severity plus optional weather-factor assessment
 - `POST /api/assistant` for context-aware agricultural guidance
+- `POST /api/auth/signup` and `POST /api/auth/login` for account access
+- `GET /api/auth/me` for the current session, or JSON `null` when signed out
+- `POST /api/auth/logout` to clear the session cookie
+- `/api/user/chat-history`, `/api/user/analyses`, and `/api/user/profile` for signed-in account data
 
-Gemini access is server-side only. The browser no longer accepts or stores a Gemini API key. Uploaded images are sent to the backend; verified presets remain explicitly labeled `Demo Mode` and do not claim to analyze arbitrary images.
+Passwords are bcrypt-hashed. Sessions use signed JWTs in HttpOnly cookies; state-changing account requests also validate a CSRF token and the frontend origin. Gemini access is server-side only. The browser no longer accepts or stores a Gemini API key. Uploaded images are sent to the backend; verified presets remain explicitly labeled `Demo Mode` and do not claim to analyze arbitrary images.
 ---
 
 ##  How to Run Locally
@@ -97,15 +101,17 @@ copy .env.example .env
 uvicorn backend.main:app --reload --port 8001
 ```
 
-Set `GEMINI_API_KEY` in `.env` to enable uploaded-image AI analysis. Set `WEATHER_API_KEY` and keep `WEATHER_PROVIDER=weatherapi` to enable WeatherAPI.com current conditions and forecast rain probability. The frontend is configured for `http://localhost:8001` and the static site for `http://localhost:8000`.
+Set `GEMINI_API_KEY` in the API process environment or `.env` to enable both uploaded-image AI analysis and the agricultural assistant. The local template leaves it blank by design: copy `.env.example` to `.env`, add a valid Gemini API key, and restart Uvicorn. `GEMINI_MODEL` defaults to `gemini-3.8-flash`; the assistant tries `gemini-3.5-flash-lite` if that model is unavailable. If the key is missing, `/api/assistant` returns an explicit configuration error rather than a deterministic answer. Set `WEATHER_API_KEY` and keep `WEATHER_PROVIDER=weatherapi` to enable WeatherAPI.com current conditions and forecast rain probability. The frontend is configured for `http://localhost:8001` and the static site for `http://localhost:8000`.
+
+Set `AUTH_SECRET` to a random secret of at least 32 bytes for local authentication. SQLite initializes on startup and creates `users` (unique email, password hash, preferred language), `chat_turns` (user-owned question and structured response), and `crop_analyses` (user-owned recent snapshots). Account history is bounded to the latest 100 chat turns and 25 analyses.
 
 Weather responses are normalized before reaching the frontend. If the key, provider, location, or upstream response is unavailable, the API returns a controlled unavailable response and the UI never fabricates weather. Risk assessment preserves the existing severity/confidence formula; configured heuristic thresholds add transparent humidity and rain factors, not disease probabilities.
 
 ### Agricultural assistant and languages
 
-The assistant accepts a farmer question, selected language, and current application context such as crop, diagnosis, risk, weather, and farm location. Supported languages are English (`en`), Telugu (`te`), and Hindi (`hi`). The selected language is persisted locally and sent to the server-side Gemini prompt.
+The assistant accepts a farmer question, selected language, and current application context such as crop, diagnosis, risk, weather, and farm location. Typed chat supports English (`en`), Telugu (`te`), and Hindi (`hi`); voice input and response playback support English and Telugu where browser Web Speech APIs are available. The selected language is persisted locally, synced to a signed-in profile, and sent to the server-side Gemini prompt.
 
-`/api/assistant` returns a validated response containing `answer`, `actions`, `warnings`, `followUp`, and `mode`. With no `GEMINI_API_KEY`, it returns clearly labeled deterministic `FALLBACK` guidance so the demo remains usable. Provider errors return a controlled error; they are never silently presented as AI output.
+`/api/assistant` returns a validated Gemini response containing `answer`, `actions`, `warnings`, `followUp`, and `mode: "AI"`. The API requires `GEMINI_API_KEY`; when it is missing, the endpoint returns an explicit configuration error instead of presenting deterministic copy as an AI answer. Provider failures likewise return controlled errors.
 
 Assistant guidance is informational only. It does not provide pesticide dosage, guaranteed cures, yield predictions, or certified agronomic advice. Farmers should consult local agriculture experts or extension officers and follow product labels and local guidance.
 
@@ -115,7 +121,13 @@ Run the current backend tests with:
 pytest
 ```
 
-The current implementation does not yet include authentication, database-backed profiles/scans, chatbot, multilingual translations, PWA caching, or a configured weather provider. These remain explicit next phases.
+### Render deployment
+
+The frontend is a static Vanilla JavaScript site and has no npm runtime dependencies. `render.yaml` defines the static site and FastAPI Web Service, with the API bound to `0.0.0.0:$PORT`, health check `/api/health`, generated `AUTH_SECRET`, and a persistent disk for SQLite. The 1 GB persistent disk uses Render's paid Starter Web Service plan; keep the disk attached to preserve user accounts and data.
+
+Set `GEMINI_API_KEY` on the API Web Service only. Keep the API base URL in the static frontend pointed at the API service (`https://cropguardian-ai.onrender.com`); never add provider credentials to the static site. The `render.yaml` service names preserve the existing `cropguardian-ai` API and `cropguardian-ai-1` static URLs. For session cookies across HTTPS deployments, keep `AUTH_COOKIE_SECURE=true` and `AUTH_COOKIE_SAMESITE=lax`.
+
+Authentication-backed chat and saved crop analyses are implemented. PWA caching and a configured weather provider remain future work.
 
 ### Option 2: VS Code Live Server
 1. Open the `CropGuardian-AI` folder in VS Code.
@@ -164,7 +176,7 @@ CropGuardian-AI/
 +-- js/
 ¦   +-- app.js               # Master controller & application lifecycle coordinator
 ¦   +-- upload.js            # Drag & drop, camera input, file validation & preset SVGs
-¦   +-- ai.js                # Gemini API layer & deterministic fallback engine
+¦   +-- ai.js                # Demo preset metadata and analysis helpers
 ¦   +-- riskMeter.js         # Risk calculation formula & semicircular SVG gauge renderer
 ¦   +-- schemes.js           # Verified government support schemes & category filter
 ¦

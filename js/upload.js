@@ -81,6 +81,9 @@ const UploadModule = (function() {
     });
 
     selectPreset('tomato-early-blight');
+    document.addEventListener('cropguardian:languagechange', () => {
+      if (activePresetId) selectPreset(activePresetId);
+    });
   }
 
   function handleFileSelect(e) {
@@ -96,11 +99,11 @@ const UploadModule = (function() {
     const extension = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')) : '';
     const allowedExtensions = { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/webp': ['.webp'] };
     if (!file || !allowedTypes.includes(file.type) || !allowedExtensions[file.type]?.includes(extension)) {
-      showToast('Please select a JPG, PNG, or WEBP image.', 'error');
+      showToast(I18nModule.translateText('Please select a JPG, PNG, or WEBP image.'), 'error');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      showToast('Image size exceeds 10MB limit.', 'error');
+      showToast(I18nModule.translateText('Image size exceeds 10MB limit.'), 'error');
       return;
     }
 
@@ -109,7 +112,7 @@ const UploadModule = (function() {
       const image = new Image();
       image.onload = function() {
         if (!image.naturalWidth || !image.naturalHeight) {
-          showToast('We could not read this image. Please choose another file.', 'error');
+          showToast(I18nModule.translateText('We could not read this image. Please choose another file.'), 'error');
           return;
         }
         selectedFile = file;
@@ -118,18 +121,18 @@ const UploadModule = (function() {
         selectedImageDataUrl = event.target.result;
         renderPreview(selectedImageDataUrl, file.name, (file.size / 1024).toFixed(1) + ' KB');
         if (Math.min(image.naturalWidth, image.naturalHeight) < 200) {
-          showToast('This image is very small. A clearer leaf photo may improve analysis.', 'info');
+          showToast(I18nModule.translateText('This image is very small. A clearer leaf photo may improve analysis.'), 'info');
         } else {
-          showToast('Image loaded successfully. Review the leaf framing before analysis.', 'success');
+          showToast(I18nModule.translateText('Image loaded successfully. Review the leaf framing before analysis.'), 'success');
         }
       };
       image.onerror = function() {
-        showToast('We could not read this image. Please choose another file.', 'error');
+        showToast(I18nModule.translateText('We could not read this image. Please choose another file.'), 'error');
       };
       image.src = event.target.result;
     };
     reader.onerror = function() {
-      showToast('We could not read this image. Please choose another file.', 'error');
+      showToast(I18nModule.translateText('We could not read this image. Please choose another file.'), 'error');
     };
     reader.readAsDataURL(file);
   }
@@ -156,7 +159,7 @@ const UploadModule = (function() {
       'healthy-tomato': 'Healthy Tomato Foliage'
     };
 
-    renderPreview(selectedImageDataUrl, titles[presetId] || 'Preset Sample', 'Demo Preset');
+    renderPreview(selectedImageDataUrl, I18nModule.translateText(titles[presetId] || 'Preset Sample'), I18nModule.translateText('Demo Preset'));
   }
 
   function renderPreview(imgSrc, title, sizeStr) {
@@ -193,7 +196,11 @@ const UploadModule = (function() {
     if (!container) return;
     const toast = document.createElement('div');
     toast.className = 'toast ' + (type === 'error' ? 'toast-error' : '');
-    toast.innerHTML = '<span>' + (type === 'error' ? '??' : '?') + '</span><span>' + message + '</span>';
+    const icon = document.createElement('span');
+    icon.textContent = type === 'error' ? '!' : 'i';
+    const content = document.createElement('span');
+    I18nModule.setText(content, message);
+    toast.append(icon, content);
     container.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';

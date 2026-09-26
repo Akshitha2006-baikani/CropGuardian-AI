@@ -6,6 +6,7 @@
  */
 
 const RiskMeterModule = (function() {
+  let lastScore = null;
   /**
    * Transparent prototype formula combining severity and confidence
    * @param {number} confidence - 0 to 100
@@ -84,6 +85,7 @@ const RiskMeterModule = (function() {
    * @param {number} targetScore - 0 to 100
    */
   function animateGauge(targetScore) {
+    lastScore = targetScore;
     const fillArc = document.getElementById('gaugeFillArc');
     const needle = document.getElementById('gaugeNeedle');
     const scoreNum = document.getElementById('gaugeScoreNum');
@@ -141,6 +143,10 @@ const RiskMeterModule = (function() {
       requestAnimationFrame(step);
     }
   }
+
+  document.addEventListener('cropguardian:languagechange', () => {
+    if (lastScore !== null) animateGauge(lastScore);
+  });
 
   return {
     calculateRiskScore,

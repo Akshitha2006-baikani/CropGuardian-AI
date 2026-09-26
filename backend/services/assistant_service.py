@@ -26,7 +26,9 @@ class AssistantService:
 
     async def answer(self, request: AssistantRequest) -> AssistantResponse:
         if not self.settings.gemini_api_key:
-            return self._fallback(request)
+            raise AssistantServiceError(
+                "Gemini is not configured on this server. Set GEMINI_API_KEY on the API service."
+            )
 
         try:
             payload = await self._fetch_gemini(request)
@@ -35,12 +37,18 @@ class AssistantService:
         except AssistantServiceError:
             raise
 
-        except (httpx.HTTPError, httpx.TimeoutException) as exc:
+        except httpx.TimeoutException as exc:
             raise AssistantServiceError(
-                "The AI assistant is temporarily unavailable."
+                "The AI assistant timed out. Please try again."
+            ) from exc
+
+        except httpx.HTTPError as exc:
+            raise AssistantServiceError(
+                "The AI assistant is temporarily unavailable. Please try again."
             ) from exc
 
         except (
+            AttributeError,
             KeyError,
             IndexError,
             TypeError,
@@ -72,24 +80,24 @@ class AssistantService:
             },
         }
 
-        # Try the primary model first, then a lighter fallback model.
-        models = [
-            self.settings.gemini_model,
+        models = list(dict.fromkeys((
+            self.settings.gemini_model.strip(),
             "gemini-3.5-flash-lite",
-        ]
+        )))
 
         last_error: Exception | None = None
+        model_configuration_error = False
 
         for model in models:
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent"
-            )
+            if not model:
+                continue
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-            # Two attempts per model.
             for attempt in range(2):
                 try:
-                    async with httpx.AsyncClient(timeout=30) as client:
+                    async with httpx.AsyncClient(
+                        timeout=httpx.Timeout(20.0, connect=8.0)
+                    ) as client:
                         response = await client.post(
                             url,
                             params={
@@ -98,53 +106,85 @@ class AssistantService:
                             json=payload,
                         )
 
-                    # Temporary/provider-capacity errors.
-                    if response.status_code in {
-                        429,
-                        500,
-                        502,
-                        503,
-                        504,
-                    }:
-                        print(
-                            f"Gemini transient error: "
-                            f"model={model} "
-                            f"status={response.status_code} "
-                            f"attempt={attempt + 1}"
+                    if response.status_code in {401, 403}:
+                        raise AssistantServiceError(
+                            "Gemini rejected the configured API key or permissions. "
+                            "Check GEMINI_API_KEY and its Gemini API access."
                         )
 
+                    if response.status_code == 429 or response.status_code >= 500:
                         last_error = httpx.HTTPStatusError(
                             f"Gemini returned HTTP {response.status_code}",
                             request=response.request,
                             response=response,
                         )
-
-                        # Retry once before moving to the next model.
                         if attempt == 0:
                             await asyncio.sleep(1)
                             continue
-
                         break
 
-                    # Non-transient HTTP error.
-                    response.raise_for_status()
+                    if response.status_code in {400, 404}:
+                        try:
+                            provider_message = str(
+                                response.json().get("error", {}).get("message", "")
+                            ).lower()
+                        except (AttributeError, ValueError):
+                            provider_message = ""
+                        if response.status_code == 404 or any(
+                            marker in provider_message
+                            for marker in ("model", "not found", "unsupported")
+                        ):
+                            model_configuration_error = True
+                            last_error = httpx.HTTPStatusError(
+                                f"Gemini rejected model {model}",
+                                request=response.request,
+                                response=response,
+                            )
+                            break
+                        if "api key" in provider_message or "permission" in provider_message:
+                            raise AssistantServiceError(
+                                "Gemini rejected the configured API key or permissions. "
+                                "Check GEMINI_API_KEY and its Gemini API access."
+                            )
+                        raise AssistantServiceError(
+                            "Gemini rejected the request. Check GEMINI_MODEL and the request configuration."
+                        )
+
+                    if response.is_error:
+                        raise AssistantServiceError(
+                            f"Gemini rejected the request (HTTP {response.status_code})."
+                        )
 
                     return response.json()
 
-                except (
-                    httpx.HTTPError,
-                    httpx.TimeoutException,
-                ) as exc:
+                except httpx.TimeoutException as exc:
                     last_error = exc
-
                     if attempt == 0:
                         await asyncio.sleep(1)
                         continue
-
+                    break
+                except httpx.HTTPError as exc:
+                    last_error = exc
+                    if attempt == 0:
+                        await asyncio.sleep(1)
+                        continue
                     break
 
+        if (
+            isinstance(last_error, httpx.HTTPStatusError)
+            and last_error.response.status_code == 429
+        ):
+            raise AssistantServiceError(
+                "Gemini's usage limit was reached. Wait briefly or check the API project's quota and billing."
+            ) from last_error
+
+        if model_configuration_error:
+            raise AssistantServiceError(
+                "No configured Gemini model is available. Set GEMINI_MODEL to a supported model."
+            ) from last_error
+
         raise AssistantServiceError(
-            "The AI assistant is temporarily unavailable."
+            "The AI assistant is temporarily unavailable. Please try again shortly."
         ) from last_error
 
     @staticmethod
@@ -153,29 +193,36 @@ class AssistantService:
         context = request.context.model_dump(exclude_none=True)
 
         return (
-            "You are a cautious agricultural information assistant "
-            "for CropGuardian AI. "
-            f"Answer the farmer in {language} only. "
-            "Do not claim to be a certified agronomist. "
-            "Use only the supplied context and general conservative "
-            "guidance. Never invent pesticide dosage, chemical "
-            "concentration, application frequency, guaranteed cures, "
-            "yield predictions, or unsupported facts. "
-            "If uncertain, advise consulting a local agriculture expert "
-            "or extension officer and following product labels/local "
-            "guidance. "
-            "Return only JSON with exactly these fields: "
-            "answer (string), actions (array of strings), "
-            "warnings (array of strings), followUp (string). "
+            "You are CropGuardian AI, a cautious agricultural information assistant. "
+            f"Answer the farmer in {language} only, using clear and practical language. "
+            "Help with crop diseases and visible symptoms, possible pests and detection, "
+            "irrigation and drainage, soil health and fertilizer decisions, weather risks, "
+            "preventive measures, and crop selection or rotation. Use supplied context "
+            "when relevant; do not invent local conditions, diagnoses, or missing facts. "
+            "State uncertainty and ask for useful details when the question lacks context. "
+            "Do not claim to be a certified agronomist. Never invent pesticide dosage, "
+            "chemical concentration, application frequency, guaranteed cures, or yield "
+            "predictions. Recommend local agriculture experts or extension officers for "
+            "uncertain or high-risk cases, and always defer to product labels and local "
+            "guidance. Return only JSON with exactly these fields: answer (string), "
+            "actions (array of strings), warnings (array of strings), followUp (string). "
             f"Farmer question: {request.clean_question}. "
             f"Context: {json.dumps(context, ensure_ascii=False)}"
         )
-
     @staticmethod
     def _parse_provider_response(
         payload: dict[str, Any],
     ) -> AssistantResponse:
-        text = payload["candidates"][0]["content"]["parts"][0]["text"]
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            raise ValueError("Gemini returned no candidates")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = next(
+            (part["text"] for part in parts if isinstance(part.get("text"), str)),
+            "",
+        )
+        if not text.strip():
+            raise ValueError("Gemini returned no text")
 
         cleaned_text = (
             text.strip()
@@ -183,7 +230,6 @@ class AssistantService:
             .removesuffix("```")
             .strip()
         )
-
         parsed = json.loads(cleaned_text)
 
         return AssistantResponse.model_validate(
@@ -193,93 +239,6 @@ class AssistantService:
             }
         )
 
-    @staticmethod
-    def _fallback(
-        request: AssistantRequest,
-    ) -> AssistantResponse:
-        context = request.context
 
-        crop = context.crop or "your crop"
-        disease = context.disease or "the reported symptoms"
-        language = request.language
+__all__ = ["AssistantService", "AssistantServiceError"]
 
-        if language == "te":
-            answer = (
-                "AI సహాయకుడు అందుబాటులో లేదు. "
-                "ఇది మీ పంటలో కనిపించిన లక్షణాల కోసం "
-                "సాధారణ మార్గదర్శకం మాత్రమే."
-            )
-
-            actions = [
-                "ప్రభావిత ఆకులను పరిశీలించండి.",
-                "తేమ మరియు వర్ష పరిస్థితులను గమనించండి.",
-                "అనిశ్చితి ఉంటే స్థానిక వ్యవసాయ నిపుణుడిని సంప్రదించండి.",
-            ]
-
-            follow_up = (
-                "తర్వాత ఎప్పుడు స్కాన్ చేయాలో "
-                "తెలుసుకోవాలనుకుంటున్నారా?"
-            )
-
-            warning = (
-                "ఇది సాధారణ మార్గదర్శకం మాత్రమే. "
-                "స్థానిక వ్యవసాయ సలహా మరియు ఉత్పత్తి "
-                "లేబుల్‌ను అనుసరించండి."
-            )
-
-        elif language == "hi":
-            answer = (
-                "AI सहायक उपलब्ध नहीं है। "
-                "यह आपकी फसल में दिखने वाले लक्षणों "
-                "के लिए सामान्य मार्गदर्शन है।"
-            )
-
-            actions = [
-                "प्रभावित पत्तियों का निरीक्षण करें।",
-                "नमी और बारिश की स्थिति पर नजर रखें।",
-                "अनिश्चितता होने पर स्थानीय कृषि विशेषज्ञ "
-                "से संपर्क करें।",
-            ]
-
-            follow_up = (
-                "क्या आप जानना चाहते हैं कि "
-                "दोबारा स्कैन कब करें?"
-            )
-
-            warning = (
-                "यह केवल सामान्य मार्गदर्शन है। "
-                "स्थानीय कृषि सलाह और उत्पाद लेबल "
-                "का पालन करें।"
-            )
-
-        else:
-            answer = (
-                f"The AI assistant is unavailable. "
-                f"This is general guidance for {disease} "
-                f"on {crop}, not a diagnosis."
-            )
-
-            actions = [
-                "Inspect visibly affected leaves.",
-                "Monitor moisture and rain conditions.",
-                "Consult a local agriculture expert if uncertain.",
-            ]
-
-            follow_up = (
-                "Would you like general guidance "
-                "on when to scan again?"
-            )
-
-            warning = (
-                "Deterministic guidance only. "
-                "Follow local agricultural guidance "
-                "and product labels."
-            )
-
-        return AssistantResponse(
-            answer=answer,
-            actions=actions,
-            warnings=[warning],
-            followUp=follow_up,
-            mode="FALLBACK",
-        )

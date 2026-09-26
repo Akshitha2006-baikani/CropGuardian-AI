@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="api-base-url" content="https://cropguardian-ai.onrender.com">
   <script>
-  window.CROPGUARDIAN_API_BASE = "https://cropguardian-ai.onrender.com";
+  window.CROPGUARDIAN_API_BASE = ["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://cropguardian-ai.onrender.com";
 </script>
-  <title>CropGuardian AI — Early Crop Disease Detection & Decision Support</title>
+  <title data-i18n-title="pageTitleHome">CropGuardian AI — Early Crop Disease Detection & Decision Support</title>
   <meta name="description" content="Helping farmers detect crop diseases early before they lose their harvest with AI-powered pathology detection and actionable decision support.">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/animations.css">
@@ -27,7 +29,6 @@
             </svg>
           </div>
           <span>CropGuardian <span class="text-lime">AI</span></span>
-          <span class="brand-badge">PROTOTYPE</span>
         </a>
 
         <ul class="nav-links" id="navLinksList">
@@ -39,7 +40,21 @@
         </ul>
 
         <div class="nav-actions">
-          <label class="language-control" for="languageSelect"><span class="sr-only">Language</span><select id="languageSelect" aria-label="Select language"><option value="en">English</option><option value="te">తెలుగు</option><option value="hi">हिन्दी</option></select></label>
+          <label class="language-control" for="languageSelect"><span class="sr-only" data-i18n="languageLabel">Language</span><select id="languageSelect" data-language-select aria-label="Select language"><option value="en">English</option><option value="te">తెలుగు</option><option value="hi">हिन्दी</option></select></label>
+          <div class="auth-widget">
+            <a id="authSignInLink" class="btn btn-secondary auth-sign-in" href="login.html">Sign in</a>
+            <div id="authProfileMenu" class="profile-menu" hidden>
+              <button id="profileMenuButton" class="profile-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+                <span id="profileUserName"></span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div id="profileDropdownMenu" class="profile-dropdown" role="menu" hidden>
+                <div class="profile-dropdown-user"><strong id="profileUserNameCopy"></strong><span id="profileUserEmail"></span></div>
+                <a href="#profile" role="menuitem">Farm profile</a>
+                <button id="logoutButton" type="button" role="menuitem">Sign out</button>
+              </div>
+            </div>
+          </div>
           <button id="btnOpenHistoryModal" class="btn-icon-only" title="Saved Snapshots History" aria-label="View Saved Snapshots">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           </button>
@@ -130,10 +145,15 @@
         <article class="assistant-panel glass-card" id="assistantPanel">
           <div class="panel-heading">
             <div><span class="card-kicker" data-i18n="assistant">Agricultural assistant</span><h2 data-i18n="assistantIntro">Ask a question about your current crop context.</h2></div>
-            <span id="assistantModeBadge" class="badge badge-demo">Deterministic guidance</span>
+            <div class="assistant-toolbar">
+              <button id="assistantClearButton" class="btn-icon-only" type="button" title="Clear chat" aria-label="Clear chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>
+              </button>
+              <span id="assistantModeBadge" class="badge badge-live" data-i18n="aiLabel">AI-generated guidance</span>
+            </div>
           </div>
           <div id="assistantMessages" class="assistant-messages" aria-live="polite">
-            <p class="assistant-empty" data-i18n="assistantIntro">Ask a question about your current crop context.</p>
+            <p class="assistant-empty" data-i18n="assistantWelcome">Hello! Ask me about crop health, pests, irrigation, fertilizer, or weather guidance.</p>
           </div>
           <div class="assistant-prompts" aria-label="Suggested questions">
             <button type="button" class="assistant-prompt" data-question="What should I do now?" data-i18n="quickNow">What should I do now?</button>
@@ -142,10 +162,16 @@
           </div>
           <form id="assistantForm" class="assistant-form">
             <label class="sr-only" for="assistantQuestion">Farmer question</label>
-            <input id="assistantQuestion" class="text-input" type="text" maxlength="1000" data-i18n-placeholder="assistantPlaceholder" placeholder="Ask about your crop..." autocomplete="off">
+            <input id="assistantQuestion" class="text-input" type="text" maxlength="1000" data-i18n-placeholder="assistantPlaceholder" placeholder="Ask about your crop..." autocomplete="off" aria-describedby="assistantTranscript">
+            <button id="assistantMicButton" class="assistant-mic" type="button" aria-label="Start voice input" aria-pressed="false" title="Speak your question">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>
+            </button>
             <button id="assistantSendButton" class="btn btn-primary" type="submit" data-i18n="send">Send</button>
           </form>
+          <p id="assistantTranscript" class="assistant-voice-status" role="status" aria-live="polite"></p>
+          <button id="assistantStopSpeakingButton" class="btn btn-secondary assistant-stop-speaking" type="button" data-i18n="stopSpeaking" hidden>Stop speaking</button>
           <p id="assistantStatus" class="form-status" role="status" aria-live="polite"></p>
+          <button id="assistantRetryButton" class="btn btn-secondary assistant-retry" type="button" data-i18n="assistantRetry" hidden>Retry</button>
           <p class="assistant-safety-note">Guidance is informational. Consult a local agriculture expert and follow product labels/local guidance.</p>
         </article>
       </div>
@@ -167,7 +193,7 @@
               <div class="input-field-group"><label class="input-label" for="farmerPhone">Phone</label><input class="text-input" id="farmerPhone" name="phone" type="tel" autocomplete="tel"></div>
               <div class="input-field-group"><label class="input-label" for="farmerEmail">Email</label><input class="text-input" id="farmerEmail" name="email" type="email" autocomplete="email"></div>
               <div class="input-field-group"><label class="input-label" for="farmerLocation">Location</label><input class="text-input" id="farmerLocation" name="location" autocomplete="address-level2"></div>
-              <div class="input-field-group"><label class="input-label" for="preferredLanguage">Preferred language</label><select class="text-input" id="preferredLanguage" name="preferredLanguage"><option value="">Not set</option><option value="English">English</option><option value="Telugu">Telugu</option><option value="Hindi">Hindi</option></select></div>
+              <div class="input-field-group"><label class="input-label" for="preferredLanguage">Preferred language</label><select class="text-input" id="preferredLanguage" name="preferredLanguage"><option value="">Not set</option><option value="en">English</option><option value="te">తెలుగు</option><option value="hi">हिन्दी</option></select></div>
             </div>
             <button class="btn btn-primary" type="submit">Save farmer profile</button><p class="form-status" id="farmerProfileStatus" role="status"></p>
           </form>
@@ -844,7 +870,9 @@
   <script src="js/ai.js"></script>
   <script src="js/riskMeter.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/voice.js"></script>
   <script src="js/assistant.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/schemes.js"></script>
