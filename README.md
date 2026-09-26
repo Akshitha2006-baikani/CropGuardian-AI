@@ -67,9 +67,6 @@ The repository now includes a lightweight FastAPI backend under `backend/`. It p
 - `GET /api/weather?location=` with an explicit unavailable response until a weather provider is configured
 - `POST /api/risk` for transparent confidence/severity plus optional weather-factor assessment
 - `POST /api/assistant` for context-aware agricultural guidance
-- `POST /api/auth/signup` and `POST /api/auth/login` for account access
-- `GET /api/auth/me` for the current session, or JSON `null` when signed out
-- `POST /api/auth/logout` to clear the session cookie
 - `/api/user/chat-history`, `/api/user/analyses`, and `/api/user/profile` for signed-in account data
 
 Passwords are bcrypt-hashed. Sessions use signed JWTs in HttpOnly cookies; state-changing account requests also validate a CSRF token and the frontend origin. Gemini access is server-side only. The browser no longer accepts or stores a Gemini API key. Uploaded images are sent to the backend; verified presets remain explicitly labeled `Demo Mode` and do not claim to analyze arbitrary images.
@@ -103,7 +100,6 @@ uvicorn backend.main:app --reload --port 8001
 
 Set `GEMINI_API_KEY` in the API process environment or `.env` to enable both uploaded-image AI analysis and the agricultural assistant. The local template leaves it blank by design: copy `.env.example` to `.env`, add a valid Gemini API key, and restart Uvicorn. `GEMINI_MODEL` defaults to `gemini-3.8-flash`; the assistant tries `gemini-3.5-flash-lite` if that model is unavailable. If the key is missing, `/api/assistant` returns an explicit configuration error rather than a deterministic answer. Set `WEATHER_API_KEY` and keep `WEATHER_PROVIDER=weatherapi` to enable WeatherAPI.com current conditions and forecast rain probability. The frontend is configured for `http://localhost:8001` and the static site for `http://localhost:8000`.
 
-Set `AUTH_SECRET` to a random secret of at least 32 bytes for local authentication. SQLite initializes on startup and creates `users` (unique email, password hash, preferred language), `chat_turns` (user-owned question and structured response), and `crop_analyses` (user-owned recent snapshots). Account history is bounded to the latest 100 chat turns and 25 analyses.
 
 Weather responses are normalized before reaching the frontend. If the key, provider, location, or upstream response is unavailable, the API returns a controlled unavailable response and the UI never fabricates weather. Risk assessment preserves the existing severity/confidence formula; configured heuristic thresholds add transparent humidity and rain factors, not disease probabilities.
 
@@ -123,8 +119,9 @@ pytest
 
 ### Render deployment
 
-The frontend is a static Vanilla JavaScript site and has no npm runtime dependencies. `render.yaml` defines the static site and FastAPI Web Service, with the API bound to `0.0.0.0:$PORT`, health check `/api/health`, generated `AUTH_SECRET`, and a persistent disk for SQLite. The 1 GB persistent disk uses Render's paid Starter Web Service plan; keep the disk attached to preserve user accounts and data.
-
+The frontend is a static Vanilla JavaScript site and has no npm runtime dependencies. `render.yaml` defines the static site and FastAPI Web Service, with the API
+ bound to `0.0.0.0:$PORT`, health check `/api/health`, and a persistent disk for SQLite. The 1 GB persistent disk uses Render's paid Starter Web Service plan; 
+The FastAPI Web Service exposes the `/api/health` endpoint for deployment health checks. The application does not require user authentication or accounts.
 Set `GEMINI_API_KEY` on the API Web Service only. Keep the API base URL in the static frontend pointed at the API service (`https://cropguardian-ai.onrender.com`); never add provider credentials to the static site. The `render.yaml` service names preserve the existing `cropguardian-ai` API and `cropguardian-ai-1` static URLs. For session cookies across HTTPS deployments, keep `AUTH_COOKIE_SECURE=true` and `AUTH_COOKIE_SAMESITE=lax`.
 
 Authentication-backed chat and saved crop analyses are implemented. PWA caching and a configured weather provider remain future work.
@@ -136,7 +133,7 @@ Authentication-backed chat and saved crop analyses are implemented. PWA caching 
 ---
 
 ##  60-Second Hackathon Demo Flow
-
+ 
 Use this exact timing sequence during your live presentation:
 
 - **0:00 – 0:10**: *Opening Hook*
@@ -148,7 +145,7 @@ Use this exact timing sequence during your live presentation:
   > *(Click "Analyze Crop" — show the 4-stage loading animation).*
 
 - **0:25 – 0:40**: *The AI Diagnosis & WOW Risk Meter*
-  > "Within 2 seconds, our AI detects the pathogen: Alternaria solani at 94% confidence. But we don't stop at just naming the disease. Look at our Crop Risk Meter: an indicative score of 78/100, flagged as Immediate Action."
+  > "Within 2 seconds, our AI detects the pathogen: Alternaria solani at 94% confidence. But we don't stop at just naming the disease. Look at our Crop Risk Meter: an indicative score of 81/100, flagged as Immediate Action."
   > *(Point to the glowing gauge needle and 'HIGH RISK' status badge).*
 
 - **0:40 – 0:52**: *Actionable Guidance*

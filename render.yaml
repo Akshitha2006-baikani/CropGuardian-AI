@@ -15,8 +15,6 @@ services:
         value: 3.11.11
       - key: DATABASE_URL
         value: sqlite:////var/data/cropguardian.db
-      - key: AUTH_SECRET
-        generateValue: true
       - key: AUTH_COOKIE_SECURE
         value: "true"
       - key: AUTH_COOKIE_SAMESITE
@@ -35,7 +33,7 @@ services:
   - type: web
     name: cropguardian-ai-1
     runtime: static
-    buildCommand: mkdir -p dist && cp index.html login.html signup.html dist/ && cp -r css js data dist/
+    buildCommand: mkdir -p dist && cp index.html dist/ && cp -r css js data dist/
     staticPublishPath: dist
     envVars:
       - key: NODE_VERSION

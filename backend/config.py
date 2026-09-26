@@ -16,12 +16,7 @@ class Settings(BaseModel):
     rain_probability_threshold: float = 60
     weather_risk_points: int = 5
     database_url: str = "sqlite:///./cropguardian.db"
-    auth_secret: str | None = None
-    auth_cookie_name: str = "cropguardian_access"
-    auth_cookie_secure: bool = False
-    auth_cookie_samesite: str = "lax"
-    auth_token_hours: int = 12
-    auth_remember_days: int = 30
+
     frontend_origin: str = "https://cropguardian-ai-1.onrender.com,http://localhost:8000,http://127.0.0.1:8000,http://localhost:5500"
     max_upload_bytes: int = 10 * 1024 * 1024
 
@@ -37,9 +32,7 @@ def get_settings() -> Settings:
         rain_probability_threshold=float(os.getenv("RAIN_PROBABILITY_THRESHOLD", 60)),
         weather_risk_points=int(os.getenv("WEATHER_RISK_POINTS", 5)),
         database_url=os.getenv("DATABASE_URL", "sqlite:///./cropguardian.db"),
-        auth_secret=os.getenv("AUTH_SECRET") or None,
-        auth_cookie_name=os.getenv("AUTH_COOKIE_NAME", "cropguardian_access"),
-        auth_cookie_secure=os.getenv("AUTH_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"},
+        
         auth_cookie_samesite=os.getenv("AUTH_COOKIE_SAMESITE", "lax").lower(),
         auth_token_hours=int(os.getenv("AUTH_TOKEN_HOURS", 12)),
         auth_remember_days=int(os.getenv("AUTH_REMEMBER_DAYS", 30)),

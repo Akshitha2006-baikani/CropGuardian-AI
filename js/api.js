@@ -86,29 +86,7 @@ const CropGuardianAPI = (function() {
     });
   }
 
-  function signup(payload) {
-    return request('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  }
-
-  function login(payload) {
-    return request('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  }
-
-  function getCurrentUser() {
-    return request('/api/auth/me');
-  }
-
-  function logout() {
-    return request('/api/auth/logout', { method: 'POST' });
-  }
+  
 
   function updateUserProfile(payload) {
     return request('/api/user/profile', {
